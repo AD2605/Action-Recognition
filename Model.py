@@ -7,6 +7,7 @@ from torch.nn.modules.utils import _triple
 import torch.backends.cudnn as cudnn
 from apex import amp
 
+
 class block(nn.Module):
     def __init__(self, in_channels, out_channels, kernel, stride, padding):
         super(block, self).__init__()
@@ -22,8 +23,9 @@ class block(nn.Module):
         temporal_stride = [stride[0], 1, 1]
         temporal_pad = [padding[0], 0, 0]
 
-        #compute intermediate channels as given in the paper
-        interim_channels = int(math.floor((kernel[0]*kernel[1]*kernel[2]*in_channels*out_channels)/((kernel[1]*kernel[2]*in_channels) + (kernel[0]*out_channels))))
+        # compute intermediate channels as given in the paper
+        interim_channels = int(math.floor((kernel[0] * kernel[1] * kernel[2] * in_channels * out_channels) / (
+                    (kernel[1] * kernel[2] * in_channels) + (kernel[0] * out_channels))))
 
         self.spatialConv = nn.Conv3d(in_channels=in_channels,
                                      out_channels=interim_channels,
@@ -37,9 +39,9 @@ class block(nn.Module):
                                       kernel_size=temporal_kernel,
                                       stride=temporal_stride,
                                       padding=temporal_pad,
-                                      bias =True)
+                                      bias=True)
 
-        self.batchNorm = nn.BatchNorm3d(interim_channels,affine=True)
+        self.batchNorm = nn.BatchNorm3d(interim_channels, affine=True)
 
     def forward(self, x):
         x = self.spatialConv(x)
@@ -48,12 +50,15 @@ class block(nn.Module):
         x = self.temporalConv(x)
         return x
 
+
 class ResidualBlock(nn.Module):
-    def __init__(self, in_channels, out_channels, kernel, stride =1):
+    def __init__(self, in_channels, out_channels, kernel, stride=1):
         super(ResidualBlock, self).__init__()
-        pad= kernel//2
-        self.Conv1 = block(in_channels=in_channels, out_channels=out_channels, kernel=kernel, stride=stride, padding=pad)
-        self.Conv2 = block(in_channels = out_channels, out_channels=out_channels, kernel=kernel, stride=stride, padding=pad)
+        pad = kernel // 2
+        self.Conv1 = block(in_channels=in_channels, out_channels=out_channels, kernel=kernel, stride=stride,
+                           padding=pad)
+        self.Conv2 = block(in_channels=out_channels, out_channels=out_channels, kernel=kernel, stride=stride,
+                           padding=pad)
         self.batchNorm = nn.BatchNorm3d(out_channels)
 
     def forward(self, x):
@@ -62,28 +67,28 @@ class ResidualBlock(nn.Module):
         res1 = nn.functional.relu(res)
         res = self.Conv2(res)
         res = self.batchNorm(res)
-        print(x.shape)
-        print(res.shape)
-        out = nn.functional.relu(res+res1)
+        out = nn.functional.relu(res + res1)
         return out
 
+
 class R2plus1D(nn.Module):
-    def __init__(self, in_channels, out_channels,kernel, depth):
+    def __init__(self, in_channels, out_channels, kernel, depth):
         super(R2plus1D, self).__init__()
         self.layer1 = ResidualBlock(in_channels=in_channels,
-                                    out_channels= out_channels,
+                                    out_channels=out_channels,
                                     kernel=kernel)
         self.layers = nn.ModuleList([])
-        for i in range(0,depth+1):
+        for i in range(0, depth + 1):
             self.layers = self.layers.append(ResidualBlock(in_channels=out_channels,
-                                                      out_channels=out_channels,
-                                                      kernel=kernel))
+                                                           out_channels=out_channels,
+                                                           kernel=kernel))
 
     def forward(self, x):
         x = self.layer1(x)
         for layer in self.layers:
             x = layer(x)
         return x
+
 
 class spatioTemporalClassifier(nn.Module):
     def __init__(self, classes):
@@ -110,12 +115,12 @@ class spatioTemporalClassifier(nn.Module):
 
     def train_model(self, model, dataloader, epochs):
         cudnn.benchmark = True
-        optimizer = torch.optim.SGD(model.parameters(),lr=0.01)
+        optimizer = torch.optim.SGD(model.parameters(), lr=0.01)
         model.train()
         model.cuda()
-        model ,optimizer = amp.initialize(model, optimizer, opt_level='O1')
+        model, optimizer = amp.initialize(model, optimizer, opt_level='O3', keep_batchnorm_fp32=False)
         scheduler = torch.optim.lr_scheduler.StepLR(optimizer=optimizer, step_size=10, gamma=0.1)
-        #criterion = torch.nn.CrossEntropyLoss().cuda()
+        # criterion = torch.nn.CrossEntropyLoss().cuda()
         criterion = torch.nn.BCELoss().cuda()
         for i in range(0, epochs):
             train_accuracy = 0
@@ -124,21 +129,19 @@ class spatioTemporalClassifier(nn.Module):
                 optimizer.zero_grad()
                 data = data.half().cuda()
                 label = label.cuda()
-                print(data.shape)
                 out = model(data)
                 loss = criterion(out, label)
-                with amp.scale_loss(loss,optimizer) as scaled_loss:
+                with amp.scale_loss(loss, optimizer) as scaled_loss:
                     scaled_loss.backward()
                     optimizer.step()
                 if torch.argmax(out) == label:
-                    train_accuracy +=1
+                    train_accuracy += 1
                 net_loss += loss.item()
             print('------------------------------------------')
             print('EPOCH ', i)
-            print(train_accuracy/len(dataloader))
-            print(net_loss/len(dataloader))
+            print(train_accuracy / len(dataloader))
+            print(net_loss / len(dataloader))
             scheduler.step()
-
 
     def evaluate(self, model, dataloader):
         model.eval()
@@ -146,10 +149,10 @@ class spatioTemporalClassifier(nn.Module):
             parameter.requires_grad = False
         correct = 0
         model.cuda()
-        for _, (x,y) in enumerate(dataloader):
+        for _, (x, y) in enumerate(dataloader):
             x = x.cuda()
             y = y.cuda()
             out = model(x)
-            if torch.argmax(out)==y:
-                correct+=1
-        print(correct/len(dataloader))
+            if torch.argmax(out) == y:
+                correct += 1
+        print(correct / len(dataloader))
