@@ -1,8 +1,6 @@
 from Model import spatioTemporalClassifier
 from Dataloaders import getDataloader
-import torch
 
-#initialize the model, get the dataloader and train.
-
-getDataloader(path='path', batch=16, workers=6)
+data = getDataloader('path', batch='batch', workers=6)
 model = spatioTemporalClassifier(classes=2)
+model.train_model(model=model, dataloader=data, epochs=2)

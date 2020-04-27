@@ -89,7 +89,7 @@ class spatioTemporalClassifier(nn.Module):
     def __init__(self, classes):
         super(spatioTemporalClassifier, self).__init__()
         self.classes = classes
-        self.linear = nn.Linear(in_features=512, out_features=classes)
+        self.linear = nn.Linear(in_features=1024, out_features=classes)
         self.conv1 = block(in_channels=3, out_channels=64, kernel=[3, 5, 5], stride=[1, 2, 2], padding=[1, 3, 3])
         self.conv2 = R2plus1D(in_channels=64, out_channels=64, kernel=3, depth=4)
         self.conv3 = R2plus1D(in_channels=64, out_channels=128, kernel=3, depth=4)
@@ -104,27 +104,27 @@ class spatioTemporalClassifier(nn.Module):
         x = self.conv4(x)
         x = self.conv5(x)
         x = self.pool(x)
-        x = x.view(-1, 512)
+        x = x.view(-1, 1024)
         x = self.linear(x)
         return x
 
     def train_model(self, model, dataloader, epochs):
         cudnn.benchmark = True
         optimizer = torch.optim.SGD(model.parameters(),lr=0.01)
-        model ,optimizer = amp.initialize(model, optimizer, opt_level='01')
         model.train()
         model.cuda()
+        model ,optimizer = amp.initialize(model, optimizer, opt_level='O1')
         scheduler = torch.optim.lr_scheduler.StepLR(optimizer=optimizer, step_size=10, gamma=0.1)
         #criterion = torch.nn.CrossEntropyLoss().cuda()
         criterion = torch.nn.BCELoss().cuda()
         for i in range(0, epochs):
-            scheduler.step()
             train_accuracy = 0
             net_loss = 0
             for _, (data, label) in enumerate(dataloader):
                 optimizer.zero_grad()
                 data = data.half().cuda()
                 label = label.cuda()
+                print(data.shape)
                 out = model(data)
                 loss = criterion(out, label)
                 with amp.scale_loss(loss,optimizer) as scaled_loss:
@@ -137,6 +137,7 @@ class spatioTemporalClassifier(nn.Module):
             print('EPOCH ', i)
             print(train_accuracy/len(dataloader))
             print(net_loss/len(dataloader))
+            scheduler.step()
 
 
     def evaluate(self, model, dataloader):
