@@ -94,12 +94,15 @@ class spatioTemporalClassifier(nn.Module):
     def __init__(self, classes):
         super(spatioTemporalClassifier, self).__init__()
         self.classes = classes
-        self.linear = nn.Linear(in_features=1024, out_features=classes)
+        if classes == 2:
+            self.linear = nn.Linear(in_features=512, out_features=1)
+        else:
+            self.linear = nn.Linear(in_features=512, out_features=classes)
         self.conv1 = block(in_channels=3, out_channels=64, kernel=[3, 5, 5], stride=[1, 2, 2], padding=[1, 3, 3])
-        self.conv2 = R2plus1D(in_channels=64, out_channels=64, kernel=3, depth=4)
-        self.conv3 = R2plus1D(in_channels=64, out_channels=128, kernel=3, depth=4)
-        self.conv4 = R2plus1D(in_channels=128, out_channels=256, kernel=3, depth=4)
-        self.conv5 = R2plus1D(in_channels=256, out_channels=512, kernel=3, depth=4)
+        self.conv2 = R2plus1D(in_channels=64, out_channels=64, kernel=3, depth=1)
+        self.conv3 = R2plus1D(in_channels=64, out_channels=128, kernel=3, depth=1)
+        self.conv4 = R2plus1D(in_channels=128, out_channels=256, kernel=3, depth=1)
+        self.conv5 = R2plus1D(in_channels=256, out_channels=512, kernel=3, depth=1)
         self.pool = nn.AdaptiveAvgPool3d(1)
 
     def forward(self, x):
@@ -109,7 +112,7 @@ class spatioTemporalClassifier(nn.Module):
         x = self.conv4(x)
         x = self.conv5(x)
         x = self.pool(x)
-        x = x.view(-1, 1024)
+        x = x.view(-1, 512)
         x = self.linear(x)
         return x
 
@@ -121,6 +124,7 @@ class spatioTemporalClassifier(nn.Module):
         model, optimizer = amp.initialize(model, optimizer, opt_level='O3', keep_batchnorm_fp32=False)
         scheduler = torch.optim.lr_scheduler.StepLR(optimizer=optimizer, step_size=10, gamma=0.1)
         # criterion = torch.nn.CrossEntropyLoss().cuda()
+        min_loss = 2000
         criterion = torch.nn.BCELoss().cuda()
         for i in range(0, epochs):
             train_accuracy = 0
@@ -128,16 +132,19 @@ class spatioTemporalClassifier(nn.Module):
             for _, (data, label) in enumerate(dataloader):
                 optimizer.zero_grad()
                 data = data.half().cuda()
-                label = label.cuda()
+                label = label.float().cuda()
                 out = model(data)
                 loss = criterion(out, label)
                 with amp.scale_loss(loss, optimizer) as scaled_loss:
                     scaled_loss.backward()
                     optimizer.step()
-                if torch.argmax(out) == label:
-                    train_accuracy += 1
+                max_index = out.max(dim=1)[1]
+                train_accuracy = (max_index==label).sum()
                 net_loss += loss.item()
             print('------------------------------------------')
+            if min_loss> net_loss:
+                torch.save(model.state_dict(), '/home/atharva/action.pth')
+                min_loss = net_loss
             print('EPOCH ', i)
             print(train_accuracy / len(dataloader))
             print(net_loss / len(dataloader))
