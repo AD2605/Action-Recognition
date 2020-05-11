@@ -1,7 +1,10 @@
 # Description
 The aim of this project is to dive into the field of action recognition and explore various techniques.
-The model is a pytorch implementation of the paper - **A Closer Look at Spatiotemporal Convolutions for Action Recognition**
+Till now 2 models have been implemented <br/>
+1 - The model.py  is a pytorch implementation of the paper - **A Closer Look at Spatiotemporal Convolutions for Action Recognition**
 Link to the paper is - **https://arxiv.org/abs/1711.11248v3**
+
+2 - A pytorch implementation of MobileNets for less computational Models. Consult the paper - **MobileNetV2: Inverted Residuals and Linear Bottlenecks  - https://arxiv.org/abs/1801.04381v4**
 
 # Dependencies 
 1 - Opencv to load and resize videos and <br/>
