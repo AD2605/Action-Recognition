@@ -36,6 +36,7 @@ class inverted_residuals(nn.Module):
                 nn.Conv3d(input_planes, output_planes, 1, 1, 0),
                 nn.BatchNorm3d(output_planes)
             )
+
         else:
             self.convolultion = nn.Sequential(
                 nn.Conv3d(input_planes,
