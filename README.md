@@ -9,6 +9,5 @@ Link to the paper is - **https://arxiv.org/abs/1711.11248v3**
 
 
 # To Do 
-1 - Implement soft trainable attention and compare the performance. <br/>
+1 - Implement attention and compare the performance. <br/>
 2 - Visualize where the model focuses <br/>
-3 - Classify actions real time
