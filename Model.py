@@ -131,7 +131,7 @@ class spatioTemporalClassifier(nn.Module):
             net_loss = 0
             for _, (data, label) in enumerate(dataloader):
                 optimizer.zero_grad()
-                data = data.half().cuda()
+                data = data.cuda()
                 label = label.float().cuda()
                 out = model(data)
                 loss = criterion(out, label)
